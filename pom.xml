@@ -3,8 +3,8 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.sf.jsqlparser</groupId>
 	<artifactId>jsqlparser</artifactId>
-	<version>0.7.1</version>
-	<name>clone of the jsqlparser library</name>
+	<version>0.7.1.1</version>
+	<name>fork of jsqlparser with column and table positions</name>
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>

@@ -1,5 +1,5 @@
 /* ================================================================
- * JSQLParser : java based sql parser 
+ * JSQLParser : java based sql parser
  * ================================================================
  *
  * Project Info:  http://jsqlparser.sourceforge.net
@@ -24,6 +24,7 @@ package net.sf.jsqlparser.schema;
 
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.ExpressionVisitor;
+import net.sf.jsqlparser.parser.TokenPosition;
 
 /**
  * A column. It can have the table name it belongs to.
@@ -31,6 +32,7 @@ import net.sf.jsqlparser.expression.ExpressionVisitor;
 public class Column implements Expression {
 	private String columnName = "";
 	private Table table;
+	private TokenPosition namePosition;
 
 	public Column() {
 	}
@@ -74,11 +76,21 @@ public class Column implements Expression {
 
 	}
 
-	public void accept(ExpressionVisitor expressionVisitor) {
+	@Override
+    public void accept(ExpressionVisitor expressionVisitor) {
 		expressionVisitor.visit(this);
 	}
 
-	public String toString() {
+	@Override
+    public String toString() {
 		return getWholeColumnName();
 	}
+
+    public TokenPosition getNamePosition() {
+        return namePosition;
+    }
+
+    public void setNamePosition(TokenPosition namePosition) {
+        this.namePosition = namePosition;
+    }
 }

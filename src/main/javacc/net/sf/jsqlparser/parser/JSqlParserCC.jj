@@ -413,25 +413,37 @@ Column Column():
 	String name1 = null;
 	String name2 = null;
 	String name3 = null;
+	TokenPosition name1_position = null;
+    TokenPosition name2_position = null;
+    TokenPosition name3_position = null;
+    TokenPosition col_position = null;
 }
 {
     // [schema.][tabella.]colonna
-    name1=RelObjectName() [ "." name2=RelObjectName() ["." name3=RelObjectName()]]
+    name1=RelObjectName() { name1_position = TokenPosition.copy(token); }[ "." name2=RelObjectName() { name2_position = TokenPosition.copy(token); } ["." name3=RelObjectName() { name3_position = TokenPosition.copy(token); }]]
     {
     	String colName = null;
     	Table table = null;
     	if (name3 != null) {
     		table = new Table(name1, name2);
+            table.setNamePosition(name2_position);
+
+            col_position = name3_position;
     		colName = name3;
     	} else if (name2 != null) {
     		table = new Table(null, name1);
+    		table.setNamePosition(name1_position);
+
+            col_position = name2_position;
     		colName = name2;
     	} else {
     		table = new Table(null, null);
+            col_position = name1_position;
     		colName = name1;
     	}
-    	
-    	return new Column(table, colName); 
+	    Column column = new Column(table, colName);
+        column.setNamePosition(col_position);
+        return column;	
    	}
 }
 
@@ -463,12 +475,13 @@ Table Table():
 	Table table = null;
 	String name1 = null;
 	String name2 = null;
+    TokenPosition position = null;
 }
 {
 	(LOOKAHEAD(3) 
-		name1=RelObjectName() "." name2=RelObjectName()  { table = new Table(name1, name2); }
+		name1=RelObjectName() "." name2=RelObjectName()  { position = TokenPosition.copy(token); table = new Table(name1, name2); table.setNamePosition(position); }
 		|
-		name1=RelObjectName() { table = new Table(null, name1); } 
+		name1=RelObjectName() { position = TokenPosition.copy(token); table = new Table(null, name1); table.setNamePosition(position); } 
 	)	
 	{		
 		return table; 

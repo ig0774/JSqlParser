@@ -1,5 +1,5 @@
 /* ================================================================
- * JSQLParser : java based sql parser 
+ * JSQLParser : java based sql parser
  * ================================================================
  *
  * Project Info:  http://jsqlparser.sourceforge.net
@@ -22,6 +22,7 @@
 
 package net.sf.jsqlparser.schema;
 
+import net.sf.jsqlparser.parser.TokenPosition;
 import net.sf.jsqlparser.statement.select.FromItem;
 import net.sf.jsqlparser.statement.select.FromItemVisitor;
 import net.sf.jsqlparser.statement.select.IntoTableVisitor;
@@ -33,6 +34,8 @@ public class Table implements FromItem {
 	private String schemaName;
 	private String name;
 	private String alias;
+	private TokenPosition namePosition;
+
 
 	public Table() {
 	}
@@ -58,11 +61,13 @@ public class Table implements FromItem {
 		schemaName = string;
 	}
 
-	public String getAlias() {
+	@Override
+    public String getAlias() {
 		return alias;
 	}
 
-	public void setAlias(String string) {
+	@Override
+    public void setAlias(String string) {
 		alias = string;
 	}
 
@@ -82,7 +87,8 @@ public class Table implements FromItem {
 
 	}
 
-	public void accept(FromItemVisitor fromItemVisitor) {
+	@Override
+    public void accept(FromItemVisitor fromItemVisitor) {
 		fromItemVisitor.visit(this);
 	}
 
@@ -90,7 +96,16 @@ public class Table implements FromItem {
 		intoTableVisitor.visit(this);
 	}
 
-	public String toString() {
+	@Override
+    public String toString() {
 		return getWholeTableName() + ((alias != null) ? " AS " + alias : "");
 	}
+
+    public TokenPosition getNamePosition() {
+        return namePosition;
+    }
+
+    public void setNamePosition(TokenPosition namePosition) {
+        this.namePosition = namePosition;
+    }
 }
