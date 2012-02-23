@@ -238,7 +238,8 @@ SPECIAL_TOKEN:
 
 TOKEN:
 {
-	< S_IDENTIFIER: ( <LETTER> )+ ( <DIGIT> | <LETTER> |<SPECIAL_CHARS>)* >
+	< S_IDENTIFIER: (<VARIABLE_DELIM>)? ( <LETTER> )+ ( <DIGIT> | <LETTER> |<SPECIAL_CHARS>)* >
+|   < #VARIABLE_DELIM: [":"] >
 | 	< #LETTER: ["a"-"z", "A"-"Z", "_"] >
 |   < #SPECIAL_CHARS: "$" | "_">
 |   < S_CHAR_LITERAL: "'" (~["'"])* "'" ("'" (~["'"])* "'")*>
@@ -525,6 +526,7 @@ PlainSelect PlainSelect():
 	FromItem fromItem = null;
 	List joins = null;
 	List distinctOn = null;
+	List intos = null;
 	Expression where = null;
 	List orderByElements;
 	List groupByColumnReferences = null;
@@ -551,7 +553,7 @@ PlainSelect PlainSelect():
     
     
      // TODO
-    [IntoClause()]
+    [intos=IntoClause() { plainSelect.setIntos(intos); }]
     [<K_FROM>
     fromItem=FromItem()
     joins=JoinsList()]
@@ -693,10 +695,13 @@ String Alias():
    { return retval; }
 }
 
-void IntoClause():
-{}
-{
-   <K_INTO> Table() ("," Table())*
+List IntoClause():
+{ List tables = new ArrayList();
+  Table table = null;
+}{
+   <K_INTO> table=Table() { tables.add(table); } ("," table=Table() { tables.add(table); })*
+   {
+     return tables;   }
 }
 
 FromItem FromItem():

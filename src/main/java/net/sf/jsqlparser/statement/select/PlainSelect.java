@@ -1,5 +1,5 @@
 /* ================================================================
- * JSQLParser : java based sql parser 
+ * JSQLParser : java based sql parser
  * ================================================================
  *
  * Project Info:  http://jsqlparser.sourceforge.net
@@ -36,7 +36,7 @@ import net.sf.jsqlparser.schema.Table;
 public class PlainSelect implements SelectBody {
 	private Distinct distinct = null;
 	private List<SelectItem> selectItems;
-	private Table into;
+	private List<Table> intos;
 	private FromItem fromItem;
 	private List<Join> joins;
 	private Expression where;
@@ -48,20 +48,20 @@ public class PlainSelect implements SelectBody {
 
 	/**
 	 * The {@link FromItem} in this query
-	 * 
+	 *
 	 * @return the {@link FromItem}
 	 */
 	public FromItem getFromItem() {
 		return fromItem;
 	}
 
-	public Table getInto() {
-		return into;
+	public List<Table> getIntos() {
+		return intos;
 	}
 
 	/**
 	 * The {@link SelectItem}s in this query (for example the A,B,C in "SELECT A,B,C")
-	 * 
+	 *
 	 * @return a list of {@link SelectItem}s
 	 */
 	public List<SelectItem> getSelectItems() {
@@ -76,8 +76,8 @@ public class PlainSelect implements SelectBody {
 		fromItem = item;
 	}
 
-	public void setInto(Table table) {
-		into = table;
+	public void setIntos(List<Table> tables) {
+		intos = tables;
 	}
 
 	public void setSelectItems(List<SelectItem> list) {
@@ -90,7 +90,7 @@ public class PlainSelect implements SelectBody {
 
 	/**
 	 * The list of {@link Join}s
-	 * 
+	 *
 	 * @return the list of {@link Join}s
 	 */
 	public List<Join> getJoins() {
@@ -101,7 +101,8 @@ public class PlainSelect implements SelectBody {
 		joins = list;
 	}
 
-	public void accept(SelectVisitor selectVisitor) {
+	@Override
+    public void accept(SelectVisitor selectVisitor) {
 		selectVisitor.visit(this);
 	}
 
@@ -147,7 +148,7 @@ public class PlainSelect implements SelectBody {
 
 	/**
 	 * A list of {@link Expression}s of the GROUP BY clause. It is null in case there is no GROUP BY clause
-	 * 
+	 *
 	 * @return a list of {@link Expression}s
 	 */
 	public List<Expression> getGroupByColumnReferences() {
@@ -158,13 +159,15 @@ public class PlainSelect implements SelectBody {
 		groupByColumnReferences = list;
 	}
 
-	public String toString() {
+	@Override
+    public String toString() {
 		String sql = "";
 
 		sql = "SELECT ";
 		sql += ((distinct != null) ? "" + distinct + " " : "");
 		sql += ((top != null) ? "" + top + " " : "");
 		sql += getStringList(selectItems);
+		sql += ((intos != null) ? " INTO " + getStringList(intos) : "");
 		sql += " FROM " + fromItem;
 		if (joins != null) {
 			Iterator<Join> it = joins.iterator();
@@ -212,9 +215,9 @@ public class PlainSelect implements SelectBody {
 	/**
 	 * List the toString out put of the objects in the List comma separated. If the List is null or empty an empty
 	 * string is returned.
-	 * 
+	 *
 	 * The same as getStringList(list, true, false)
-	 * 
+	 *
 	 * @see #getStringList(List, boolean, boolean)
 	 * @param list
 	 *            list of objects with toString methods
@@ -227,7 +230,7 @@ public class PlainSelect implements SelectBody {
 	/**
 	 * List the toString out put of the objects in the List that can be comma separated. If the List is null or empty an
 	 * empty string is returned.
-	 * 
+	 *
 	 * @param list
 	 *            list of objects with toString methods
 	 * @param useComma

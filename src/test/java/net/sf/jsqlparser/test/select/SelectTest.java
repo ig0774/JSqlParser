@@ -22,8 +22,6 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.AllTableColumns;
-import net.sf.jsqlparser.statement.select.Join;
-import net.sf.jsqlparser.statement.select.OrderByElement;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectExpressionItem;
@@ -37,6 +35,21 @@ public class SelectTest extends TestCase {
 
 	public SelectTest(String arg0) {
 		super(arg0);
+	}
+
+	public void testSelectInto() throws JSQLParserException {
+		String statement = "SELECT * INTO foo, bar FROM mytable";
+		Select select = (Select) parserManager.parse(new StringReader(statement));
+		assertNotNull(((PlainSelect)select.getSelectBody()).getIntos());
+		assertFalse(((PlainSelect)select.getSelectBody()).getIntos().isEmpty());
+	}
+
+	public void testSelectIntoVariable() throws JSQLParserException {
+	    String statement = "SELECT * INTO :foo, :bar FROM mytable";
+	    Select select = (Select) parserManager.parse(new StringReader(statement));
+	    assertNotNull(((PlainSelect)select.getSelectBody()).getIntos());
+		assertEquals(":foo", ((PlainSelect)select.getSelectBody()).getIntos().get(0).getName());
+		assertEquals(":bar", ((PlainSelect)select.getSelectBody()).getIntos().get(1).getName());
 	}
 
 	public void testLimit() throws JSQLParserException {
@@ -136,10 +149,10 @@ public class SelectTest extends TestCase {
 		Select select = (Select) parserManager.parse(new StringReader(statement));
 		Union union = (Union) select.getSelectBody();
 		assertEquals(3, union.getPlainSelects().size());
-		assertEquals("mytable", ((Table) ((PlainSelect) union.getPlainSelects().get(0)).getFromItem()).getName());
-		assertEquals("mytable3", ((Table) ((PlainSelect) union.getPlainSelects().get(1)).getFromItem()).getName());
-		assertEquals("mytable2", ((Table) ((PlainSelect) union.getPlainSelects().get(2)).getFromItem()).getName());
-		assertEquals(3, ((PlainSelect) union.getPlainSelects().get(2)).getLimit().getOffset());
+		assertEquals("mytable", ((Table) union.getPlainSelects().get(0).getFromItem()).getName());
+		assertEquals("mytable3", ((Table) union.getPlainSelects().get(1).getFromItem()).getName());
+		assertEquals("mytable2", ((Table) union.getPlainSelects().get(2).getFromItem()).getName());
+		assertEquals(3, union.getPlainSelects().get(2).getLimit().getOffset());
 
 		// use brakets for toString
 		// use standard limit syntax
@@ -169,9 +182,9 @@ public class SelectTest extends TestCase {
 		PlainSelect plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(3, plainSelect.getJoins().size());
 		assertEquals("mytable0", ((Table) plainSelect.getFromItem()).getAlias());
-		assertEquals("alias_tab1", ((Join) plainSelect.getJoins().get(0)).getRightItem().getAlias());
-		assertEquals("alias_tab2", ((Join) plainSelect.getJoins().get(1)).getRightItem().getAlias());
-		assertEquals("mytable4", ((Join) plainSelect.getJoins().get(2)).getRightItem().getAlias());
+		assertEquals("alias_tab1", plainSelect.getJoins().get(0).getRightItem().getAlias());
+		assertEquals("alias_tab2", plainSelect.getJoins().get(1).getRightItem().getAlias());
+		assertEquals("mytable4", plainSelect.getJoins().get(2).getRightItem().getAlias());
 		assertStatementCanBeDeparsedAs(select, statementToString);
 	}
 
@@ -180,27 +193,27 @@ public class SelectTest extends TestCase {
 		Select select = (Select) parserManager.parse(new StringReader(statement));
 		PlainSelect plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(1, plainSelect.getJoins().size());
-		assertEquals("tab2", ((Table) ((Join) plainSelect.getJoins().get(0)).getRightItem()).getWholeTableName());
+		assertEquals("tab2", ((Table) plainSelect.getJoins().get(0).getRightItem()).getWholeTableName());
 		assertEquals("tab1.id",
-				((Column) ((EqualsTo) ((Join) plainSelect.getJoins().get(0)).getOnExpression()).getLeftExpression())
+				((Column) ((EqualsTo) plainSelect.getJoins().get(0).getOnExpression()).getLeftExpression())
 						.getWholeColumnName());
-		assertTrue(((Join) plainSelect.getJoins().get(0)).isOuter());
+		assertTrue(plainSelect.getJoins().get(0).isOuter());
 		assertStatementCanBeDeparsedAs(select, statement);
 
 		statement = "SELECT * FROM tab1 LEFT OUTER JOIN tab2 ON tab1.id = tab2.id INNER JOIN tab3";
 		select = (Select) parserManager.parse(new StringReader(statement));
 		plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(2, plainSelect.getJoins().size());
-		assertEquals("tab3", ((Table) ((Join) plainSelect.getJoins().get(1)).getRightItem()).getWholeTableName());
-		assertFalse(((Join) plainSelect.getJoins().get(1)).isOuter());
+		assertEquals("tab3", ((Table) plainSelect.getJoins().get(1).getRightItem()).getWholeTableName());
+		assertFalse(plainSelect.getJoins().get(1).isOuter());
 		assertStatementCanBeDeparsedAs(select, statement);
 
 		statement = "SELECT * FROM tab1 LEFT OUTER JOIN tab2 ON tab1.id = tab2.id JOIN tab3";
 		select = (Select) parserManager.parse(new StringReader(statement));
 		plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(2, plainSelect.getJoins().size());
-		assertEquals("tab3", ((Table) ((Join) plainSelect.getJoins().get(1)).getRightItem()).getWholeTableName());
-		assertFalse(((Join) plainSelect.getJoins().get(1)).isOuter());
+		assertEquals("tab3", ((Table) plainSelect.getJoins().get(1).getRightItem()).getWholeTableName());
+		assertFalse(plainSelect.getJoins().get(1).isOuter());
 		assertStatementCanBeDeparsedAs(select, statement);
 
 		// implicit INNER
@@ -216,11 +229,11 @@ public class SelectTest extends TestCase {
 		select = (Select) parserManager.parse(new StringReader(statement));
 		plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(1, plainSelect.getJoins().size());
-		assertEquals("tab2", ((Table) ((Join) plainSelect.getJoins().get(0)).getRightItem()).getWholeTableName());
-		assertFalse(((Join) plainSelect.getJoins().get(0)).isOuter());
-		assertEquals(2, ((Join) plainSelect.getJoins().get(0)).getUsingColumns().size());
+		assertEquals("tab2", ((Table) plainSelect.getJoins().get(0).getRightItem()).getWholeTableName());
+		assertFalse(plainSelect.getJoins().get(0).isOuter());
+		assertEquals(2, plainSelect.getJoins().get(0).getUsingColumns().size());
 		assertEquals("id2",
-				((Column) ((Join) plainSelect.getJoins().get(0)).getUsingColumns().get(1)).getWholeColumnName());
+				plainSelect.getJoins().get(0).getUsingColumns().get(1).getWholeColumnName());
 		assertStatementCanBeDeparsedAs(select, statement);
 
 		statement = "SELECT * FROM tab1 RIGHT OUTER JOIN tab2 USING (id, id2)";
@@ -367,12 +380,12 @@ public class SelectTest extends TestCase {
 		PlainSelect plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(2, plainSelect.getOrderByElements().size());
 		assertEquals("tab1.a",
-				((Column) ((OrderByElement) plainSelect.getOrderByElements().get(0)).getExpression())
+				((Column) plainSelect.getOrderByElements().get(0).getExpression())
 						.getWholeColumnName());
 		assertEquals("b",
-				((Column) ((OrderByElement) plainSelect.getOrderByElements().get(1)).getExpression()).getColumnName());
-		assertTrue(((OrderByElement) plainSelect.getOrderByElements().get(1)).isAsc());
-		assertFalse(((OrderByElement) plainSelect.getOrderByElements().get(0)).isAsc());
+				((Column) plainSelect.getOrderByElements().get(1).getExpression()).getColumnName());
+		assertTrue(plainSelect.getOrderByElements().get(1).isAsc());
+		assertFalse(plainSelect.getOrderByElements().get(0).isAsc());
 		assertStatementCanBeDeparsedAs(select, statementToString);
 
 		statement = "SELECT * FROM tab1 WHERE a > 34 GROUP BY tab1.b ORDER BY tab1.a, 2";
@@ -380,9 +393,9 @@ public class SelectTest extends TestCase {
 		plainSelect = (PlainSelect) select.getSelectBody();
 		assertEquals(2, plainSelect.getOrderByElements().size());
 		assertEquals("a",
-				((Column) ((OrderByElement) plainSelect.getOrderByElements().get(0)).getExpression()).getColumnName());
+				((Column) plainSelect.getOrderByElements().get(0).getExpression()).getColumnName());
 		assertEquals(2,
-				((LongValue) ((OrderByElement) plainSelect.getOrderByElements().get(1)).getExpression()).getValue());
+				((LongValue) plainSelect.getOrderByElements().get(1).getExpression()).getValue());
 		assertStatementCanBeDeparsedAs(select, statement);
 
 	}
@@ -560,7 +573,7 @@ public class SelectTest extends TestCase {
 		String statement = "SELECT col1 & 32, col2 ^ col1, col1 | col2" + " FROM table1";
 		assertSqlCanBeParsedAndDeparsed(statement);
 	}
-	
+
 	public void testSelectFunction() throws JSQLParserException {
 		String statement = "SELECT 1+2 AS sum";
 		parserManager.parse(new StringReader(statement));
