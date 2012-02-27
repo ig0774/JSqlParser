@@ -10,12 +10,17 @@ public class TokenPosition {
     /** The column number of the last character of this Token. */
     public int endColumn;
 
+    public int beginOffset;
+    public int endOffset;
+
     public static TokenPosition copy(Token token) {
         TokenPosition pos = new TokenPosition();
         pos.beginLine = token.beginLine;
         pos.endLine = token.endLine;
         pos.beginColumn = token.beginColumn;
         pos.endColumn = token.endColumn;
+        pos.beginOffset = token.beginOffset;
+        pos.endOffset = token.endOffset;
         return pos;
     }
 }

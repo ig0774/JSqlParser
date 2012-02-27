@@ -23,6 +23,7 @@
 options{
     IGNORE_CASE=true ;
     STATIC=false;
+    TOKEN_EXTENDS = "OffsetToken";
 //  DEBUG_LOOKAHEAD= true ;
 //  FORCE_LA_CHECK=true;
 //  DEBUG_TOKEN_MANAGER=true;
