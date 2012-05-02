@@ -123,6 +123,7 @@ import net.sf.jsqlparser.statement.select.SelectBody;
 import net.sf.jsqlparser.statement.select.SelectExpressionItem;
 import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.select.SubSelect;
+import net.sf.jsqlparser.statement.select.InsertQuerySource;
 import net.sf.jsqlparser.statement.select.Top;
 import net.sf.jsqlparser.statement.select.Union;
 import net.sf.jsqlparser.statement.select.WithItem;
@@ -376,7 +377,7 @@ Insert Insert():
 		[LOOKAHEAD(2) "(" ]
 		(
 			{ insert.setUseValues(false); }
-			itemsList=  SubSelect() 
+			itemsList = InsertQuerySource()
 		)
 		[ ")" ]
 	)
@@ -1510,6 +1511,16 @@ SubSelect SubSelect():
     	subSelect.setSelectBody(selectBody);
     	return subSelect;
     }
+}
+
+InsertQuerySource InsertQuerySource():
+{
+	SelectBody selectBody = null;}
+{    selectBody=SelectBody()
+    {
+    	InsertQuerySource insertQuerySource = new InsertQuerySource();
+    	insertQuerySource.setSelectBody(selectBody);
+    	return insertQuerySource;    }
 }
 
 CreateTable CreateTable():
