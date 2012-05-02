@@ -361,15 +361,12 @@ public class SelectTest extends TestCase {
 	}
 
 	public void testExists() throws JSQLParserException {
-		String statement = "SELECT * FROM tab1 WHERE";
-		String where = " EXISTS (SELECT * FROM tab2)";
-		statement += where;
+		String statement = "SELECT * FROM tab1 WHERE EXISTS (SELECT * FROM tab2)";
 		Statement parsed = parserManager.parse(new StringReader(statement));
 
 		assertEquals(statement, parsed.toString());
 
-		PlainSelect plainSelect = (PlainSelect) ((Select) parsed).getSelectBody();
-		assertExpressionCanBeDeparsedAs(plainSelect.getWhere(), where);
+		assertSqlCanBeParsedAndDeparsed(statement);
 	}
 
 	public void testOrderBy() throws JSQLParserException {
