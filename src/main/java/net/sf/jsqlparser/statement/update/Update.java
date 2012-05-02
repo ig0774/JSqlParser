@@ -29,6 +29,7 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.StatementVisitor;
+import net.sf.jsqlparser.statement.select.PlainSelect;
 
 /**
  * The update statement.
@@ -83,6 +84,34 @@ public class Update implements Statement {
 
 	public void setExpressions(List<Expression> list) {
 		expressions = list;
+	}
+
+	public String toString() {
+		StringBuilder sql = new StringBuilder();
+
+		sql
+			.append("UPDATE ")
+			.append(table)
+			.append(" SET ");
+		
+		for (int i = 0; i < columns.size(); i++) {
+			sql
+				.append(columns.get(i))
+				.append(" = ")
+				.append(expressions.get(i));
+			
+			if (i < columns.size() - 1) {
+				sql.append(", ");
+			}
+		}
+
+		if (where != null) {
+			sql
+				.append(" WHERE ")
+				.append(where);
+		}
+
+		return sql.toString();
 	}
 
 }

@@ -10,7 +10,9 @@ import net.sf.jsqlparser.expression.StringValue;
 import net.sf.jsqlparser.expression.operators.relational.GreaterThanEquals;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.schema.Column;
+import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.update.Update;
+import net.sf.jsqlparser.util.deparser.StatementDeParser;
 
 public class UpdateTest extends TestCase {
 	CCJSqlParserManager parserManager = new CCJSqlParserManager();
@@ -33,10 +35,28 @@ public class UpdateTest extends TestCase {
 
 		assertTrue(update.getWhere() instanceof GreaterThanEquals);
 	}
+	
+	public void testUpdateDeparsing() throws JSQLParserException {
+		String statement = "UPDATE mytable SET col1 = 'as', col2 = ? WHERE o >= 3";
+		assertSqlCanBeParsedAndDeparsed(statement);
+	}
 
 	public void testUpdateWAlias() throws JSQLParserException {
 		String statement = "UPDATE table1 A SET A.column = 'XXX' WHERE A.cod_table = 'YYY'";
 		Update update = (Update) parserManager.parse(new StringReader(statement));
+	}
+
+	private void assertSqlCanBeParsedAndDeparsed(String statement) throws JSQLParserException {
+		Statement parsed = parserManager.parse(new StringReader(statement));
+		assertStatementCanBeDeparsedAs(parsed, statement);
+	}
+
+	private void assertStatementCanBeDeparsedAs(Statement parsed, String statement) {
+		assertEquals(statement, parsed.toString());
+
+		StatementDeParser deParser = new StatementDeParser(new StringBuilder());
+		parsed.accept(deParser);
+		assertEquals(statement, deParser.getBuffer().toString());
 	}
 
 	public static void main(String[] args) {
