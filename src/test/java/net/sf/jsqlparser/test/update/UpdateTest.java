@@ -43,7 +43,7 @@ public class UpdateTest extends TestCase {
 
 	public void testUpdateWAlias() throws JSQLParserException {
 		String statement = "UPDATE table1 A SET A.column = 'XXX' WHERE A.cod_table = 'YYY'";
-		Update update = (Update) parserManager.parse(new StringReader(statement));
+		parserManager.parse(new StringReader(statement));
 	}
 
 	private void assertSqlCanBeParsedAndDeparsed(String statement) throws JSQLParserException {
@@ -57,10 +57,6 @@ public class UpdateTest extends TestCase {
 		StatementDeParser deParser = new StatementDeParser(new StringBuilder());
 		parsed.accept(deParser);
 		assertEquals(statement, deParser.getBuffer().toString());
-	}
-
-	public static void main(String[] args) {
-		junit.swingui.TestRunner.run(UpdateTest.class);
 	}
 
 }

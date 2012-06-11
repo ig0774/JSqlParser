@@ -20,10 +20,10 @@ import net.sf.jsqlparser.statement.select.SelectExpressionItem;
 import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.select.SelectItemVisitor;
 import net.sf.jsqlparser.statement.select.SelectVisitor;
+import net.sf.jsqlparser.statement.select.SetOperationList;
 import net.sf.jsqlparser.statement.select.SubJoin;
 import net.sf.jsqlparser.statement.select.SubSelect;
 import net.sf.jsqlparser.statement.select.Top;
-import net.sf.jsqlparser.statement.select.Union;
 
 /**
  * A class to de-parse (that is, tranform from JSqlParser hierarchy into a string) a
@@ -77,10 +77,8 @@ public class SelectDeParser implements SelectVisitor, OrderByVisitor, SelectItem
 			}
 		}
 
-		buffer.append(" ");
-
 		if (plainSelect.getFromItem() != null) {
-			buffer.append("FROM ");
+			buffer.append(" FROM ");
 			plainSelect.getFromItem().accept(this);
 		}
 
@@ -118,31 +116,6 @@ public class SelectDeParser implements SelectVisitor, OrderByVisitor, SelectItem
 
 		if (plainSelect.getLimit() != null) {
 			deparseLimit(plainSelect.getLimit());
-		}
-
-	}
-
-	public void visit(Union union) {
-		for (Iterator<PlainSelect> iter = union.getPlainSelects().iterator(); iter.hasNext();) {
-			buffer.append("(");
-			PlainSelect plainSelect = iter.next();
-			plainSelect.accept(this);
-			buffer.append(")");
-			if (iter.hasNext()) {
-				buffer.append(" UNION ");
-				if (union.isAll()) {
-					buffer.append("ALL ");// should UNION be a BinaryExpression ?
-				}
-			}
-
-		}
-
-		if (union.getOrderByElements() != null) {
-			deparseOrderBy(union.getOrderByElements());
-		}
-
-		if (union.getLimit() != null) {
-			deparseLimit(union.getLimit());
 		}
 
 	}
@@ -286,4 +259,22 @@ public class SelectDeParser implements SelectVisitor, OrderByVisitor, SelectItem
 
 	}
 
+	@Override
+	public void visit(SetOperationList list) {
+		for (int i=0;i<list.getPlainSelects().size();i++) {
+			if (i!=0)
+				buffer.append(' ').append(list.getOperations().get(i-1)).append(' ');
+			buffer.append("(");
+			PlainSelect plainSelect = (PlainSelect) list.getPlainSelects().get(i);
+			plainSelect.accept(this);
+			buffer.append(")");
+		}
+		if (list.getOrderByElements() != null) {
+			deparseOrderBy(list.getOrderByElements());
+		}
+
+		if (list.getLimit() != null) {
+			deparseLimit(list.getLimit());
+		}
+	}
 }

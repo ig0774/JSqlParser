@@ -1,7 +1,7 @@
 /* ================================================================
  * JSQLParser : java based sql parser 
  * ================================================================
- *
+ * 
  * Project Info:  http://jsqlparser.sourceforge.net
  * Project Lead:  Leonardo Francalanci (leoonardoo@yahoo.it);
  *
@@ -71,6 +71,8 @@ import net.sf.jsqlparser.expression.NullValue;
 import net.sf.jsqlparser.expression.Parenthesis;
 import net.sf.jsqlparser.expression.StringValue;
 import net.sf.jsqlparser.expression.CaseExpression;
+import net.sf.jsqlparser.expression.CastExpression;
+import net.sf.jsqlparser.expression.AnalyticExpression;
 import net.sf.jsqlparser.expression.WhenClause;
 import net.sf.jsqlparser.expression.AnyComparisonExpression;
 import net.sf.jsqlparser.expression.AllComparisonExpression;
@@ -81,6 +83,7 @@ import net.sf.jsqlparser.expression.operators.arithmetic.BitwiseXor;
 import net.sf.jsqlparser.expression.operators.arithmetic.Concat;
 import net.sf.jsqlparser.expression.operators.arithmetic.Division;
 import net.sf.jsqlparser.expression.operators.arithmetic.Multiplication;
+import net.sf.jsqlparser.expression.operators.arithmetic.Modulo;
 import net.sf.jsqlparser.expression.operators.arithmetic.Subtraction;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
@@ -125,7 +128,11 @@ import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.select.SubSelect;
 import net.sf.jsqlparser.statement.select.InsertQuerySource;
 import net.sf.jsqlparser.statement.select.Top;
-import net.sf.jsqlparser.statement.select.Union;
+import net.sf.jsqlparser.statement.select.SetOperationList;
+import net.sf.jsqlparser.statement.select.UnionOp;
+import net.sf.jsqlparser.statement.select.MinusOp;
+import net.sf.jsqlparser.statement.select.ExceptOp;
+import net.sf.jsqlparser.statement.select.IntersectOp;
 import net.sf.jsqlparser.statement.select.WithItem;
 import net.sf.jsqlparser.statement.truncate.Truncate;
 import net.sf.jsqlparser.statement.update.Update;
@@ -214,6 +221,11 @@ TOKEN: /* SQL Keywords. prefixed with K_ to avoid name clashes */
 |   <K_TRUNCATE:"TRUNCATE">
 |   <K_DISTINCT:"DISTINCT">
 |   <K_INTERSECT:"INTERSECT">
+|   <K_CAST:"CAST">
+|   <K_EXCEPT:"EXCEPT">
+|   <K_MINUS:"MINUS">
+|   <K_OVER:"OVER">
+|   <K_PARTITION:"PARTITION">
 }
 
 
@@ -244,7 +256,7 @@ TOKEN:
 | 	< #LETTER: ["a"-"z", "A"-"Z", "_"] >
 |   < #SPECIAL_CHARS: "$" | "_">
 |   < S_CHAR_LITERAL: "'" (~["'"])* "'" ("'" (~["'"])* "'")*>
-|   < S_QUOTED_IDENTIFIER: "\"" (~["\n","\r","\""])* "\"" | ("`" (~["\n","\r","`"])* "`") >
+|   < S_QUOTED_IDENTIFIER: "\"" (~["\n","\r","\""])* "\"" | ("`" (~["\n","\r","`"])* "`") | ("[" (~["\n","\r","]"])* "]") >
 }
 
 
@@ -512,8 +524,8 @@ SelectBody SelectBody():
 { SelectBody selectBody = null; }
 {
 	(
-		LOOKAHEAD(Union())
-		    selectBody = Union() 
+		LOOKAHEAD(SetOperationList())
+		    selectBody = SetOperationList() 
     	|
 	    selectBody = PlainSelect()
 	)
@@ -573,8 +585,42 @@ PlainSelect PlainSelect():
 	}
 }
 
+SetOperationList SetOperationList():
+{
+	SetOperationList list = new SetOperationList();
+	List orderByElements = null;
+	Limit limit = null;
+	PlainSelect select = null;
+	ArrayList selects = new ArrayList();
+	ArrayList operations = new ArrayList();
+}
+{
+	(
+	
+		(
+			(("(" select=PlainSelect() ")") | (select=PlainSelect() )) {selects.add(select);}
+			(
+				((<K_UNION> { UnionOp union = new UnionOp();operations.add(union); } [ <K_ALL> { union.setAll(true); } | <K_DISTINCT> { union.setDistinct(true); } ])
+				| <K_INTERSECT> { operations.add(new IntersectOp()); }
+				| <K_MINUS> { operations.add(new MinusOp()); }
+				| <K_EXCEPT> { operations.add(new ExceptOp()); }
+				)
 
+				(("(" select=PlainSelect() ")") | (select=PlainSelect() )) {selects.add(select);} 
+			)+
+		)
 
+		[orderByElements=OrderByElements() {list.setOrderByElements(orderByElements);} ]
+		[limit=Limit() {list.setLimit(limit);} ]
+	)
+
+	{ 
+		list.setOpsAndSelects(selects,operations);
+		return list; 
+	}
+}
+
+/*
 Union Union():
 { 
 	Union union = new Union(); 
@@ -582,9 +628,9 @@ Union Union():
 	Limit limit = null;
 	PlainSelect select = null;
 	ArrayList selects = new ArrayList();
-/*
+
 this is not 100% right, since multiple UNION could have different ALL/DISTINCT clauses...
-*/
+
 }
 {
 	(
@@ -612,6 +658,7 @@ this is not 100% right, since multiple UNION could have different ALL/DISTINCT c
 		return union; 
 	}
 }
+*/
 
 List WithList():
 {
@@ -1018,11 +1065,14 @@ Expression RegularCondition():
 	Expression leftExpression;
 	Expression rightExpression;
 	boolean not = false;
+	int oracleJoin=EqualsTo.NO_ORACLE_JOIN;
 }
 {
 
 	[ <K_NOT> { not = true; } ] 
 	leftExpression=ComparisonItem() { result = leftExpression; }
+
+	[ "(+)" { oracleJoin=EqualsTo.ORACLE_JOIN_RIGHT; } ]
 
 	(
 	">" { result = new GreaterThan(); }
@@ -1034,12 +1084,18 @@ Expression RegularCondition():
 	| "@@" { result = new Matches(); }
 	)
 	rightExpression=ComparisonItem()
+
+	[ "(+)" { oracleJoin=EqualsTo.ORACLE_JOIN_LEFT; } ]
+
 	{
 		BinaryExpression regCond = (BinaryExpression) result;
 		regCond.setLeftExpression(leftExpression);
 		regCond.setRightExpression(rightExpression);
 		if (not)
 			regCond.setNot();
+
+		if (oracleJoin>0)
+			((EqualsTo)result).setOldOracleJoinSyntax(oracleJoin);
 	}		
 	
 	{ return result; }
@@ -1120,8 +1176,11 @@ Expression IsNullExpression():
 	Expression leftExpression = null;
 }
 {
-	leftExpression=SimpleExpression()
-    <K_IS> [<K_NOT> { result.setNot(true); } ] <K_NULL>
+	(
+	<K_NOT> { result.setNot(true); } leftExpression=SimpleExpression() <K_IS> <K_NULL>
+	| 
+	leftExpression=SimpleExpression() <K_IS> [<K_NOT> { result.setNot(true); } ] <K_NULL>
+	)
 
 	{ 
 		result.setLeftExpression(leftExpression);
@@ -1323,7 +1382,9 @@ Expression MultiplicativeExpression():
       { result = leftExpression; }
     (
     	LOOKAHEAD(2) ("*" { result = new Multiplication(); }
-    								| "/" { result = new Division(); } ) 
+    								| "/" { result = new Division(); }
+    								| "%" { result = new Modulo(); }
+    				) 
     								
 				(
 				LOOKAHEAD(BitwiseXor())
@@ -1382,8 +1443,10 @@ Expression PrimaryExpression():
 	|	retval=CaseWhenExpression()
 	
 	| "?" { retval = new JdbcParameter(); }
+
+	| LOOKAHEAD(AnalyticExpression()) retval=AnalyticExpression()
 	
-	|    LOOKAHEAD([ "+" | "-"] Function()) [ "+" | "-" { isInverse = true; }] retval=Function() 
+	| LOOKAHEAD([ "+" | "-"] Function()) [ "+" | "-" { isInverse = true; }] retval=Function() 
 	
 	| LOOKAHEAD([	"+" | "-"] <S_DOUBLE>) 	[	"+" | "-" { tmp = "-"; }]  token=<S_DOUBLE> { retval = new DoubleValue(tmp+token.image); }
 	
@@ -1392,6 +1455,8 @@ Expression PrimaryExpression():
 	| LOOKAHEAD(2) 	[ "+" | "-" { isInverse = true; }] retval=Column() 
 
 	| LOOKAHEAD(2) [ "+" | "-" { isInverse = true; }]  "(" retval=PrimaryExpression() ")" {retval = new Parenthesis(retval); }
+
+	| LOOKAHEAD(2) [ "+" | "-" { isInverse = true; }] retval=CastExpression()
 
 	| token=<S_CHAR_LITERAL> { retval = new StringValue(token.image); }
 
@@ -1414,6 +1479,46 @@ Expression PrimaryExpression():
     }
 }
 
+AnalyticExpression AnalyticExpression() :
+{
+	AnalyticExpression retval = new AnalyticExpression();
+	List plist = new ArrayList();
+	List olist = null;
+	Token token = null;
+	Column column = null;
+}
+{
+	token=<S_IDENTIFIER> { retval.setName(token.image); } "(" ")" <K_OVER> "(" [<K_PARTITION> <K_BY> (column=Column() {plist.add(column);} )+ ] olist=OrderByElements() 
+	{
+		retval.setPartitionByColumns(plist);
+		retval.setOrderByElements(olist);
+	} 
+	")"
+	{
+		return retval;
+	}
+}
+
+CastExpression CastExpression():
+{
+	CastExpression retval = new CastExpression();
+	String typeName = null;
+	Expression expression = null;
+}
+{
+	<K_CAST>
+	"("
+	expression=SimpleExpression()
+	<K_AS>
+	typeName=RelObjectName()
+	")"
+
+    {
+	    retval.setLeftExpression(expression);
+	    retval.setTypeName(typeName);
+    	return retval;
+    }
+}
 
 Expression CaseWhenExpression():
 {
@@ -1427,11 +1532,11 @@ Expression CaseWhenExpression():
 	<K_CASE> 
 	(
     	    ( clause=WhenThenSearchCondition() { whenClauses.add(clause); } )+
-             [<K_ELSE> elseExp=PrimaryExpression()]
+             [<K_ELSE> elseExp=SimpleExpression()]
 		|
 		    switchExp=PrimaryExpression()
              ( clause=WhenThenValue() { whenClauses.add(clause); } )*
-             [<K_ELSE> elseExp=PrimaryExpression()]
+             [<K_ELSE> elseExp=SimpleExpression()]
 	)             
     <K_END>
     { 
@@ -1551,8 +1656,10 @@ CreateTable CreateTable():
 	<K_TABLE> table=Table() 
 	[
 		"("
-		
-		columnName=<S_IDENTIFIER>
+		(columnName=<S_IDENTIFIER>
+		|
+		columnName=<S_QUOTED_IDENTIFIER>)
+
 		colDataType = ColDataType()
 		{
 			columnSpecs = new ArrayList();
@@ -1611,7 +1718,9 @@ CreateTable CreateTable():
 				)
 				|
 				(
-					columnName=<S_IDENTIFIER> 
+					(columnName=<S_IDENTIFIER>
+					|
+					columnName=<S_QUOTED_IDENTIFIER>)
 					colDataType = ColDataType()
 					{
 						columnSpecs = new ArrayList();

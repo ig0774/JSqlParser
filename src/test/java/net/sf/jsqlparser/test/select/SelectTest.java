@@ -25,7 +25,7 @@ import net.sf.jsqlparser.statement.select.AllTableColumns;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectExpressionItem;
-import net.sf.jsqlparser.statement.select.Union;
+import net.sf.jsqlparser.statement.select.SetOperationList;
 import net.sf.jsqlparser.util.deparser.ExpressionDeParser;
 import net.sf.jsqlparser.util.deparser.SelectDeParser;
 import net.sf.jsqlparser.util.deparser.StatementDeParser;
@@ -77,9 +77,9 @@ public class SelectTest extends TestCase {
 		statement = "(SELECT * FROM mytable WHERE mytable.col = 9 OFFSET ?) UNION "
 				+ "(SELECT * FROM mytable2 WHERE mytable2.col = 9 OFFSET ?) LIMIT 3, 4";
 		select = (Select) parserManager.parse(new StringReader(statement));
-		Union union = (Union) select.getSelectBody();
-		assertEquals(3, union.getLimit().getOffset());
-		assertEquals(4, union.getLimit().getRowCount());
+		SetOperationList setList = (SetOperationList) select.getSelectBody();
+		assertEquals(3, setList.getLimit().getOffset());
+		assertEquals(4, setList.getLimit().getRowCount());
 
 		// toString uses standard syntax
 		statement = "(SELECT * FROM mytable WHERE mytable.col = 9 OFFSET ?) UNION "
@@ -145,15 +145,15 @@ public class SelectTest extends TestCase {
 	public void testUnion() throws JSQLParserException {
 		String statement = "SELECT * FROM mytable WHERE mytable.col = 9 UNION "
 				+ "SELECT * FROM mytable3 WHERE mytable3.col = ? UNION " + "SELECT * FROM mytable2 LIMIT 3,4";
-
+		
 		Select select = (Select) parserManager.parse(new StringReader(statement));
-		Union union = (Union) select.getSelectBody();
-		assertEquals(3, union.getPlainSelects().size());
-		assertEquals("mytable", ((Table) union.getPlainSelects().get(0).getFromItem()).getName());
-		assertEquals("mytable3", ((Table) union.getPlainSelects().get(1).getFromItem()).getName());
-		assertEquals("mytable2", ((Table) union.getPlainSelects().get(2).getFromItem()).getName());
-		assertEquals(3, union.getPlainSelects().get(2).getLimit().getOffset());
-
+		SetOperationList setList = (SetOperationList) select.getSelectBody();
+		assertEquals(3, setList.getPlainSelects().size());
+		assertEquals("mytable", ((Table) ((PlainSelect) setList.getPlainSelects().get(0)).getFromItem()).getName());
+		assertEquals("mytable3", ((Table) ((PlainSelect) setList.getPlainSelects().get(1)).getFromItem()).getName());
+		assertEquals("mytable2", ((Table) ((PlainSelect) setList.getPlainSelects().get(2)).getFromItem()).getName());
+		assertEquals(3, ((PlainSelect) setList.getPlainSelects().get(2)).getLimit().getOffset());
+		
 		// use brakets for toString
 		// use standard limit syntax
 		String statementToString = "(SELECT * FROM mytable WHERE mytable.col = 9) UNION "
@@ -361,11 +361,14 @@ public class SelectTest extends TestCase {
 	}
 
 	public void testExists() throws JSQLParserException {
-		String statement = "SELECT * FROM tab1 WHERE EXISTS (SELECT * FROM tab2)";
+		String statement = "SELECT * FROM tab1 WHERE ";
+		String where = "EXISTS (SELECT * FROM tab2)";
+		statement += where;
+		
 		Statement parsed = parserManager.parse(new StringReader(statement));
-
+		
 		assertEquals(statement, parsed.toString());
-
+		
 		assertSqlCanBeParsedAndDeparsed(statement);
 	}
 
@@ -572,8 +575,155 @@ public class SelectTest extends TestCase {
 	}
 
 	public void testSelectFunction() throws JSQLParserException {
-		String statement = "SELECT 1+2 AS sum";
-		parserManager.parse(new StringReader(statement));
+		String statement = "SELECT 1 + 2 AS sum";
+		assertSqlCanBeParsedAndDeparsed(statement);
+	}
+	
+	public void testCast() throws JSQLParserException  {
+		String stmt = "SELECT CAST(a AS varchar) FROM tabelle1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+		stmt = "SELECT CAST(a AS varchar2) FROM tabelle1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testCastInCast() throws JSQLParserException {
+		String stmt = "SELECT CAST(CAST(a AS numeric) AS varchar) FROM tabelle1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+
+	public void testCastInCast2() throws JSQLParserException {
+		String stmt = "SELECT CAST('test' + CAST(assertEqual AS numeric) AS varchar) FROM tabelle1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testCaseElseAddition() throws JSQLParserException  {
+		String stmt = "SELECT CASE WHEN 1 + 3 > 20 THEN 0 ELSE 1000 + 1 END AS d FROM dual";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testBrackets() throws JSQLParserException {
+		String stmt = "SELECT table_a.name AS [Test] FROM table_a";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testBrackets2() throws JSQLParserException {
+		String stmt = "SELECT [a] FROM t";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testProblemSqlServer_Modulo_Proz() throws Exception {
+		String stmt = "SELECT 5 % 2 FROM A";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testProblemSqlServer_Modulo_mod() throws Exception {
+		String stmt = "SELECT mod(5, 2) FROM A";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testProblemSqlServer_Modulo() throws Exception {
+		String stmt = "SELECT convert(varchar(255), DATEDIFF(month, year1, abc_datum) / 12) + ' year, ' + convert(varchar(255), DATEDIFF(month, year2, abc_datum) % 12) + ' month' FROM test_table";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testIsNot() throws JSQLParserException {
+		String stmt = "SELECT * FROM test WHERE a IS NOT NULL";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testIsNot2() throws JSQLParserException {
+		//the deparser delivers always a IS NOT NULL even for NOT a IS NULL
+		String stmt = "SELECT * FROM test WHERE NOT a IS NULL";
+		Statement parsed = parserManager.parse(new StringReader(stmt));
+		assertStatementCanBeDeparsedAs(parsed,"SELECT * FROM test WHERE a IS NOT NULL");
+	}
+	
+	public void testProblemSqlAnalytic() throws JSQLParserException {
+		String stmt = "SELECT a, row_number() OVER (ORDER BY a) AS n FROM table1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testProblemSqlAnalytic2() throws JSQLParserException {
+		String stmt = "SELECT a, row_number() OVER (ORDER BY a, b) AS n FROM table1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testProblemSqlAnalytic3() throws JSQLParserException {
+		String stmt = "SELECT a, row_number() OVER (PARTITION BY c ORDER BY a, b) AS n FROM table1";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testOracleJoin() throws JSQLParserException {
+		String stmt = "SELECT * FROM tabelle1, tabelle2 WHERE tabelle1.a = tabelle2.b(+)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testOracleJoin2() throws JSQLParserException {
+		String stmt = "SELECT * FROM tabelle1, tabelle2 WHERE tabelle1.a(+) = tabelle2.b";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testProblemSqlIntersect() throws Exception {
+		String stmt = "(SELECT * FROM a) INTERSECT (SELECT * FROM b)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+		
+		stmt = "SELECT * FROM a INTERSECT SELECT * FROM b";
+		Statement parsed = parserManager.parse(new StringReader(stmt));
+		assertStatementCanBeDeparsedAs(parsed,"(SELECT * FROM a) INTERSECT (SELECT * FROM b)");
+	}
+	
+	public void testProblemSqlExcept() throws Exception {
+		String stmt = "(SELECT * FROM a) EXCEPT (SELECT * FROM b)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+		
+		stmt = "SELECT * FROM a EXCEPT SELECT * FROM b";
+		Statement parsed = parserManager.parse(new StringReader(stmt));
+		assertStatementCanBeDeparsedAs(parsed,"(SELECT * FROM a) EXCEPT (SELECT * FROM b)");
+	}
+	
+	public void testProblemSqlMinus() throws Exception {
+		String stmt = "(SELECT * FROM a) MINUS (SELECT * FROM b)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+		
+		stmt = "SELECT * FROM a MINUS SELECT * FROM b";
+		Statement parsed = parserManager.parse(new StringReader(stmt));
+		assertStatementCanBeDeparsedAs(parsed,"(SELECT * FROM a) MINUS (SELECT * FROM b)");
+	}
+	
+	public void testProblemSqlCombinedSets() throws Exception {
+		String stmt = "(SELECT * FROM a) INTERSECT (SELECT * FROM b) UNION (SELECT * FROM c)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testWithStatement() throws JSQLParserException {
+		String stmt = "WITH test AS (SELECT mslink FROM feature) SELECT * FROM feature WHERE mslink IN (SELECT mslink FROM test)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testWithUnionProblem() throws JSQLParserException {
+		String stmt = "WITH test AS ((SELECT mslink FROM tablea) UNION (SELECT mslink FROM tableb)) SELECT * FROM tablea WHERE mslink IN (SELECT mslink FROM test)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testWithUnionAllProblem() throws JSQLParserException {
+		String stmt = "WITH test AS ((SELECT mslink FROM tablea) UNION ALL (SELECT mslink FROM tableb)) SELECT * FROM tablea WHERE mslink IN (SELECT mslink FROM test)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testWithUnionProblem3() throws JSQLParserException {
+		String stmt = "WITH test AS ((SELECT mslink, CAST(tablea.fname AS varchar) FROM tablea INNER JOIN tableb ON tablea.mslink = tableb.mslink AND tableb.deleted = 0 WHERE tablea.fname IS NULL AND 1 = 0) UNION ALL (SELECT mslink FROM tableb)) SELECT * FROM tablea WHERE mslink IN (SELECT mslink FROM test)";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testWithUnionProblem4() throws JSQLParserException {
+		String stmt = "WITH hist AS ((SELECT gl.mslink, ba.gl_name AS txt, ba.gl_nummer AS nr, 0 AS level, CAST(gl.mslink AS VARCHAR) AS path, ae.feature FROM tablea AS gl INNER JOIN tableb AS ba ON gl.mslink = ba.gl_mslink INNER JOIN tablec AS ae ON gl.mslink = ae.mslink AND ae.deleted = 0 WHERE gl.parent IS NULL AND gl.mslink <> 0) UNION ALL (SELECT gl.mslink, ba.gl_name AS txt, ba.gl_nummer AS nr, hist.level + 1 AS level, CAST(hist.path + '.' + CAST(gl.mslink AS VARCHAR) AS VARCHAR) AS path, ae.feature FROM tablea AS gl INNER JOIN tableb AS ba ON gl.mslink = ba.gl_mslink INNER JOIN tablec AS ae ON gl.mslink = ae.mslink AND ae.deleted = 0 INNER JOIN hist ON gl.parent = hist.mslink WHERE gl.mslink <> 0)) SELECT mslink, space(level * 4) + txt AS txt, nr, feature, path FROM hist WHERE EXISTS (SELECT feature FROM tablec WHERE mslink = 0 AND ((feature IN (1, 2) AND hist.feature = 3) OR (feature IN (4) AND hist.feature = 2)))";
+		assertSqlCanBeParsedAndDeparsed(stmt);
+	}
+	
+	public void testWithUnionProblem5() throws JSQLParserException {
+		String stmt = "WITH hist AS ((SELECT gl.mslink, ba.gl_name AS txt, ba.gl_nummer AS nr, 0 AS level, CAST(gl.mslink AS VARCHAR) AS path, ae.feature FROM tablea AS gl INNER JOIN tableb AS ba ON gl.mslink = ba.gl_mslink INNER JOIN tablec AS ae ON gl.mslink = ae.mslink AND ae.deleted = 0 WHERE gl.parent IS NULL AND gl.mslink <> 0) UNION ALL (SELECT gl.mslink, ba.gl_name AS txt, ba.gl_nummer AS nr, hist.level + 1 AS level, CAST(hist.path + '.' + CAST(gl.mslink AS VARCHAR) AS VARCHAR) AS path, 5 AS feature FROM tablea AS gl INNER JOIN tableb AS ba ON gl.mslink = ba.gl_mslink INNER JOIN tablec AS ae ON gl.mslink = ae.mslink AND ae.deleted = 0 INNER JOIN hist ON gl.parent = hist.mslink WHERE gl.mslink <> 0)) SELECT * FROM hist";
+		assertSqlCanBeParsedAndDeparsed(stmt);
 	}
 
 	private void assertSqlCanBeParsedAndDeparsed(String statement) throws JSQLParserException {
@@ -599,9 +749,4 @@ public class SelectTest extends TestCase {
 
 		assertEquals(expression, stringBuffer.toString());
 	}
-
-	public static void main(String[] args) {
-		junit.swingui.TestRunner.run(SelectTest.class);
-	}
-
 }

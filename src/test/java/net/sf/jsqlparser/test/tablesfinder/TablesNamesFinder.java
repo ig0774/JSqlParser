@@ -5,9 +5,11 @@ import java.util.Iterator;
 import java.util.List;
 
 import net.sf.jsqlparser.expression.AllComparisonExpression;
+import net.sf.jsqlparser.expression.AnalyticExpression;
 import net.sf.jsqlparser.expression.AnyComparisonExpression;
 import net.sf.jsqlparser.expression.BinaryExpression;
 import net.sf.jsqlparser.expression.CaseExpression;
+import net.sf.jsqlparser.expression.CastExpression;
 import net.sf.jsqlparser.expression.DateValue;
 import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.Expression;
@@ -28,6 +30,7 @@ import net.sf.jsqlparser.expression.operators.arithmetic.BitwiseOr;
 import net.sf.jsqlparser.expression.operators.arithmetic.BitwiseXor;
 import net.sf.jsqlparser.expression.operators.arithmetic.Concat;
 import net.sf.jsqlparser.expression.operators.arithmetic.Division;
+import net.sf.jsqlparser.expression.operators.arithmetic.Modulo;
 import net.sf.jsqlparser.expression.operators.arithmetic.Multiplication;
 import net.sf.jsqlparser.expression.operators.arithmetic.Subtraction;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
@@ -53,9 +56,9 @@ import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectVisitor;
+import net.sf.jsqlparser.statement.select.SetOperationList;
 import net.sf.jsqlparser.statement.select.SubJoin;
 import net.sf.jsqlparser.statement.select.SubSelect;
-import net.sf.jsqlparser.statement.select.Union;
 
 public class TablesNamesFinder implements SelectVisitor, FromItemVisitor, ExpressionVisitor, ItemsListVisitor {
 	private List tables;
@@ -80,17 +83,10 @@ public class TablesNamesFinder implements SelectVisitor, FromItemVisitor, Expres
 
 	}
 
-	public void visit(Union union) {
-		for (Iterator iter = union.getPlainSelects().iterator(); iter.hasNext();) {
-			PlainSelect plainSelect = (PlainSelect) iter.next();
-			visit(plainSelect);
-		}
-	}
-
 	public void visit(Table tableName) {
 		String tableWholeName = tableName.getWholeTableName();
 		tables.add(tableWholeName);
-	}
+	} 
 
 	public void visit(SubSelect subSelect) {
 		subSelect.getSelectBody().accept(this);
@@ -270,4 +266,23 @@ public class TablesNamesFinder implements SelectVisitor, FromItemVisitor, Expres
 		visitBinaryExpression(bitwiseXor);
 	}
 
+	@Override
+	public void visit(CastExpression cast) {
+		cast.getLeftExpression().accept(this);
+	}
+	
+	public void visit(Modulo modulo) {
+		visitBinaryExpression(modulo);
+	}
+	
+	public void visit(AnalyticExpression analytic) {
+		
+	}
+
+	public void visit(SetOperationList list) {
+		for (Iterator iter = list.getPlainSelects().iterator(); iter.hasNext();) {
+			PlainSelect plainSelect = (PlainSelect) iter.next();
+			visit(plainSelect);
+		}
+	}
 }

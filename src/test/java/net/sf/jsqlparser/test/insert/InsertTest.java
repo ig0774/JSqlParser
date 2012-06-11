@@ -94,9 +94,4 @@ public class InsertTest extends TestCase {
 		parsed.accept(deParser);
 		assertEquals(statement, deParser.getBuffer().toString());
 	}
-
-	public static void main(String[] args) {
-		junit.swingui.TestRunner.run(InsertTest.class);
-	}
-
 }

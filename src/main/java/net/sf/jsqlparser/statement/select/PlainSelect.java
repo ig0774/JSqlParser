@@ -168,25 +168,27 @@ public class PlainSelect implements SelectBody {
 		sql += ((top != null) ? "" + top + " " : "");
 		sql += getStringList(selectItems);
 		sql += ((intos != null) ? " INTO " + getStringList(intos) : "");
-		sql += " FROM " + fromItem;
-		if (joins != null) {
-			Iterator<Join> it = joins.iterator();
-			while (it.hasNext()) {
-				Join join = it.next();
-				if (join.isSimple()) {
-					sql += ", " + join;
-				} else {
-					sql += " " + join;
+		if (fromItem != null) {
+			sql += " FROM " + fromItem;
+			if (joins != null) {
+				Iterator<Join> it = joins.iterator();
+				while (it.hasNext()) {
+					Join join = it.next();
+					if (join.isSimple()) {
+						sql += ", " + join;
+					} else {
+						sql += " " + join;
+					}
 				}
 			}
+			// sql += getFormatedList(joins, "", false, false);
+			sql += ((where != null) ? " WHERE " + where : "");
+			sql += getFormatedList(groupByColumnReferences, "GROUP BY");
+			sql += ((having != null) ? " HAVING " + having : "");
+			sql += orderByToString(orderByElements);
+			sql += ((limit != null) ? limit + "" : "");
 		}
-		// sql += getFormatedList(joins, "", false, false);
-		sql += ((where != null) ? " WHERE " + where : "");
-		sql += getFormatedList(groupByColumnReferences, "GROUP BY");
-		sql += ((having != null) ? " HAVING " + having : "");
-		sql += orderByToString(orderByElements);
-		sql += ((limit != null) ? limit + "" : "");
-
+		
 		return sql;
 	}
 
